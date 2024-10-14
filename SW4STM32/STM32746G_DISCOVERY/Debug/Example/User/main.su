@@ -1,0 +1,4 @@
+C:/Users/Pinthu/STM32CubeIDE/Test_Project1/BSP/Src/main.c:78:5:main	192	static,ignoring_inline_asm
+C:/Users/Pinthu/STM32CubeIDE/Test_Project1/BSP/Src/main.c:336:9:CheckForUserInput	8	static
+C:/Users/Pinthu/STM32CubeIDE/Test_Project1/BSP/Src/main.c:352:6:HAL_GPIO_EXTI_Callback	8	static
+C:/Users/Pinthu/STM32CubeIDE/Test_Project1/BSP/Src/main.c:394:6:HAL_ADC_ConvCpltCallback	8	static
