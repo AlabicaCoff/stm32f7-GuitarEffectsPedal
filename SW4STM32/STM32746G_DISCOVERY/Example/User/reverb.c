@@ -5,6 +5,8 @@
 
 void ApplyReverb(int16_t *buffer, int16_t *output, uint32_t size, float reverb_time, float mix)
 {
+	reverb_time = reverb_time * (1000.0/4096.0);
+	mix = mix * (1.4/4096.0);
     static int16_t reverb_buffer[48000];  // Reverb buffer for 1 second at 48kHz
     static uint32_t reverb_index = 0;     // Circular buffer index for reverb
 

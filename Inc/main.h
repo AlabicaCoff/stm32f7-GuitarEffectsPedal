@@ -85,10 +85,13 @@
 /* Exported types ------------------------------------------------------------*/
 typedef struct
 {
-  void   (*DemoFunc)(void);
-  uint8_t DemoName[50]; 
-  uint32_t DemoIndex;
-}BSP_DemoTypedef;
+  uint8_t Name[50];
+  int ParametersNum;
+  float Parameter1;
+  float Parameter2;
+  float Parameter3;
+  float Parameter4;
+}EffectTypedef;
 
 typedef enum {
   AUDIO_ERROR_NONE = 0,
@@ -102,6 +105,8 @@ extern const unsigned char stlogo[];
 extern uint8_t     NbLoop;
 extern uint8_t     MfxExtiReceived;
 extern int	   EffectIndex;
+extern int 	   ParameterIndex;
+extern EffectTypedef  effects[];
 #ifndef USE_FULL_ASSERT
 extern uint32_t    ErrorCounter;
 #endif
@@ -116,11 +121,12 @@ extern uint32_t    ErrorCounter;
 #define ADCx_RELEASE_RESET()            __HAL_RCC_ADC_RELEASE_RESET()
 
 /* Definition for ADCx Channel Pin */
-#define ADCx_CHANNEL_PIN                GPIO_PIN_10
+#define ADCx_CHANNEL_PIN                GPIO_PIN_10 //| GPIO_PIN_8 | GPIO_PIN_7 | GPIO_PIN_6
 #define ADCx_CHANNEL_GPIO_PORT          GPIOF
 
 /* Definition for ADCx's Channel */
 #define ADCx_CHANNEL                    ADC_CHANNEL_8
+
 
 /* Definition for ADCx's DMA */
 #define ADCx_DMA_CHANNEL                DMA_CHANNEL_2

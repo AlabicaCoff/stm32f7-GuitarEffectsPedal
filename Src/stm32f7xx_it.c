@@ -46,6 +46,8 @@ extern SAI_HandleTypeDef haudio_in_sai;
 extern SDRAM_HandleTypeDef sdramHandle;
 extern ADC_HandleTypeDef    AdcHandle;
 extern int EffectIndex;
+extern int ParameterIndex;
+extern EffectTypedef  effects[];
 /* Private function prototypes -----------------------------------------------*/
 /* Private functions ---------------------------------------------------------*/
 
@@ -184,7 +186,7 @@ void EXTI0_IRQHandler(void)
             EffectIndex++;
             if (EffectIndex >= 5)
 			{
-				EffectIndex = 5;
+				EffectIndex = 0;
 			}
             // Update the debounce time
             debounce_time = HAL_GetTick();
@@ -231,10 +233,10 @@ void EXTI15_10_IRQHandler(void)
 		  __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_15);
 
 		  // Add your code here, e.g., toggle an LED
-		  EffectIndex--;
-		  if (EffectIndex <= 0)
+		  ParameterIndex++;
+		  if (ParameterIndex >= effects[EffectIndex].ParametersNum)
 		  {
-			  EffectIndex = 0;
+			  ParameterIndex = 0;
 		  }
 
 		  // Update the debounce time

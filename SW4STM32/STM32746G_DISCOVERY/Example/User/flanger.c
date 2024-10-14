@@ -7,6 +7,10 @@
 
 void ApplyFlanger(int16_t *buffer, int16_t *output, uint32_t size, float delay_depth, float rate, float feedback, float mix)
 {
+	delay_depth = delay_depth * (6.0/4096.0);
+	rate = rate * (1.0/4096.0);
+	feedback = feedback * (0.6/4096.0);
+	mix = mix * (1.2/4096);
     static float lfo_phase = 0.0f;  // LFO phase for modulation
     static int16_t delay_buffer[48000];  // Delay buffer for 1 second at 48kHz
     static uint32_t delay_index = 0;     // Circular buffer index for delay

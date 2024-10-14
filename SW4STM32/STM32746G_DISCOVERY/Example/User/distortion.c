@@ -3,6 +3,8 @@
 
 void ApplyDistortion(int16_t *buffer, int16_t *output, uint32_t size, float gain, int16_t threshold)
 {
+	gain = gain * (2.4 / 4096.0);
+	threshold = threshold * (50000.0 / 4096.0);
     for (uint32_t i = 0; i < size; i++)
     {
         // Apply gain

@@ -5,6 +5,9 @@
 
 void ApplyFuzz(int16_t *buffer, int16_t *output, uint32_t size, float gain, float depth, int16_t threshold)
 {
+	gain = gain * (3.0 / 4096.0);
+	depth = depth * (2.4 / 4096.0);
+	threshold = threshold * (30000.0 / 4096.0);
     static float previous_sample = 0; // To store the previous output sample
 
     for (uint32_t i = 0; i < size; i++)

@@ -1,245 +1,193 @@
-/**
-  ******************************************************************************
-  * @file    BSP/Src/audio.c
-  * @author  MCD Application Team
-  * @brief   This example code shows how to use the audio feature in the
-  *          stm32746g_discovery driver
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2016 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
-
-/* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include <stdio.h>
 #include "string.h"
-
-/** @addtogroup STM32F7xx_HAL_Examples
-  * @{
-  */
-
-/** @addtogroup BSP
-  * @{
-  */
-
-/* Private typedef -----------------------------------------------------------*/
+#include <math.h>
 
 typedef enum
 {
   BUFFER_OFFSET_NONE = 0,
   BUFFER_OFFSET_HALF = 1,
   BUFFER_OFFSET_FULL = 2,
-}BUFFER_StateTypeDef;
+} BUFFER_StateTypeDef;
+
+#define AUDIO_BLOCK_SIZE	((uint32_t) 0x3E80)		// 16,000 element
+#define AUDIO_NB_BLOCKS		((uint32_t) 16)			// n block
+#define OUTPUT_ADDR			(AUDIO_REC_START_ADDR + (AUDIO_NB_BLOCKS * AUDIO_BLOCK_SIZE * 2))
+
+#define ROTARY_MODULATION_FREQ 5.0f
 
 extern AUDIO_ErrorTypeDef AUDIO_Start(uint32_t audio_start_address, uint32_t audio_file_size);
+extern EffectTypedef  effects[];
 
-#define AUDIO_BLOCK_SIZE   ((uint32_t)0xFFFE)
-#define AUDIO_NB_BLOCKS    ((uint32_t)4)
+uint32_t audio_rec_buffer_state;
+static uint16_t internal_buffer[AUDIO_BLOCK_SIZE]; 	// 16 bit * 16,000 element, per 1 block
+int stop_record;
+char str_buf[40];
 
-/* Private define ------------------------------------------------------------*/
-/* Private macro -------------------------------------------------------------*/
-/* Private variables ---------------------------------------------------------*/
-static uint16_t  internal_buffer[AUDIO_BLOCK_SIZE];
-
-/* Global variables ---------------------------------------------------------*/
-uint32_t  audio_rec_buffer_state;
-
-/* Private function prototypes -----------------------------------------------*/
-static void AudioRec_SetHint(void);
-/* Private functions ---------------------------------------------------------*/
-
-/**
-  * @brief  Audio Play demo
-  * @param  None
-  * @retval None
-  */
-void AudioRec_demo (void)
+void AudioRec_SetHint()
 {
-  uint32_t  block_number;
+	BSP_LCD_Clear(LCD_COLOR_WHITE);
 
-  AudioRec_SetHint();
+	BSP_LCD_SetTextColor(LCD_COLOR_BLUE);
+	BSP_LCD_FillRect(0, 0, BSP_LCD_GetXSize(), 90);
+	BSP_LCD_SetTextColor(LCD_COLOR_WHITE);
+	BSP_LCD_SetBackColor(LCD_COLOR_BLUE);
+	BSP_LCD_SetFont(&Font24);
+	BSP_LCD_DisplayStringAt(0, 0, (uint8_t*) "AUDIO RECORD EXAMPLE", CENTER_MODE);
+	BSP_LCD_SetFont(&Font12);
+	BSP_LCD_DisplayStringAt(0, 30, (uint8_t*) "Press User button for next menu", CENTER_MODE);
 
-  /* Initialize Audio Recorder */
-  if (BSP_AUDIO_IN_Init(DEFAULT_AUDIO_IN_FREQ, DEFAULT_AUDIO_IN_BIT_RESOLUTION, DEFAULT_AUDIO_IN_CHANNEL_NBR) == AUDIO_OK)
-  {
-    BSP_LCD_SetBackColor(LCD_COLOR_WHITE);
-    BSP_LCD_SetTextColor(LCD_COLOR_GREEN);
-    BSP_LCD_DisplayStringAt(0, BSP_LCD_GetYSize() - 95, (uint8_t *)"  AUDIO RECORD INIT OK  ", CENTER_MODE);
-  }
-  else
-  {
-    BSP_LCD_SetBackColor(LCD_COLOR_WHITE);
-    BSP_LCD_SetTextColor(LCD_COLOR_RED);
-    BSP_LCD_DisplayStringAt(0, BSP_LCD_GetYSize() - 95, (uint8_t *)"  AUDIO RECORD INIT FAIL", CENTER_MODE);
-    BSP_LCD_DisplayStringAt(0, BSP_LCD_GetYSize() - 80, (uint8_t *)" Try to reset board ", CENTER_MODE);
-  }
-
-  audio_rec_buffer_state = BUFFER_OFFSET_NONE;
-
-  /* Display the state on the screen */
-  BSP_LCD_SetBackColor(LCD_COLOR_WHITE);
-  BSP_LCD_SetTextColor(LCD_COLOR_BLUE);
-  BSP_LCD_DisplayStringAt(0, BSP_LCD_GetYSize() - 80, (uint8_t *)"       RECORDING...     ", CENTER_MODE);
-
-  /* Start Recording */
-  BSP_AUDIO_IN_Record(internal_buffer, AUDIO_BLOCK_SIZE);
-
-  for (block_number = 0; block_number < AUDIO_NB_BLOCKS; block_number++)
-  {
-    /* Wait end of half block recording */
-    while(audio_rec_buffer_state != BUFFER_OFFSET_HALF)
-    {
-      if (CheckForUserInput() > 0)
-      {
-        /* Stop Player before close Test */
-        BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW);
-        return;
-      }
-    }
-    audio_rec_buffer_state = BUFFER_OFFSET_NONE;
-    /* Copy recorded 1st half block in SDRAM */
-    memcpy((uint32_t *)(AUDIO_REC_START_ADDR + (block_number * AUDIO_BLOCK_SIZE * 2)),
-           internal_buffer,
-           AUDIO_BLOCK_SIZE);
-
-    /* Wait end of one block recording */
-    while(audio_rec_buffer_state != BUFFER_OFFSET_FULL)
-    {
-      if (CheckForUserInput() > 0)
-      {
-        /* Stop Player before close Test */
-        BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW);
-        return;
-      }
-    }
-    audio_rec_buffer_state = BUFFER_OFFSET_NONE;
-    /* Copy recorded 2nd half block in SDRAM */
-    memcpy((uint32_t *)(AUDIO_REC_START_ADDR + (block_number * AUDIO_BLOCK_SIZE * 2) + (AUDIO_BLOCK_SIZE)),
-           (uint16_t *)(&internal_buffer[AUDIO_BLOCK_SIZE/2]),
-           AUDIO_BLOCK_SIZE);
-  }
-
-  /* Stop recorder */
-  BSP_AUDIO_IN_Stop(CODEC_PDWN_SW);
-
-  BSP_LCD_SetBackColor(LCD_COLOR_WHITE);
-  BSP_LCD_SetTextColor(LCD_COLOR_BLUE);
-  BSP_LCD_DisplayStringAt(0, BSP_LCD_GetYSize() - 65, (uint8_t *)"RECORDING DONE, START PLAYBACK...", CENTER_MODE);
-
-  /* -----------Start Playback -------------- */
-  /* Initialize audio IN at REC_FREQ*/ 
-  BSP_AUDIO_OUT_Init(OUTPUT_DEVICE_HEADPHONE, 70, DEFAULT_AUDIO_IN_FREQ);
-  BSP_AUDIO_OUT_SetAudioFrameSlot(CODEC_AUDIOFRAME_SLOT_02);
-
-  /* Play the recorded buffer*/
-  AUDIO_Start(AUDIO_REC_START_ADDR, AUDIO_BLOCK_SIZE * AUDIO_NB_BLOCKS * 2);  /* Use Audio play demo to playback sound */
-  BSP_LCD_DisplayStringAt(0, BSP_LCD_GetYSize() - 40, (uint8_t *)"PLAYBACK DONE", CENTER_MODE);
-
-  while (1)
-  {
-    AUDIO_Process();
-    
-    if (CheckForUserInput() > 0)
-    {
-      /* Stop Player before close Test */
-      BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW);
-      return;
-    }
-  }
+	BSP_LCD_SetTextColor(LCD_COLOR_BLUE);
+	BSP_LCD_DrawRect(10, 100, BSP_LCD_GetXSize() - 20, BSP_LCD_GetYSize() - 110);
+	BSP_LCD_DrawRect(11, 101, BSP_LCD_GetXSize() - 22, BSP_LCD_GetYSize() - 112);
 }
 
-/**
-  * @brief  Display Audio Record demo hint
-  * @param  None
-  * @retval None
-  */
-static void AudioRec_SetHint(void)
+void AUDIO_Effect(uint32_t bytes_size)
 {
-  /* Clear the LCD */
-  BSP_LCD_Clear(LCD_COLOR_WHITE);
+	int16_t* original = (int16_t*) AUDIO_REC_START_ADDR;
+	int16_t* output = (int16_t*) OUTPUT_ADDR;
+	uint32_t lenght =  bytes_size / 2;
 
-  /* Set Audio Demo description */
-  BSP_LCD_SetTextColor(LCD_COLOR_BLUE);
-  BSP_LCD_FillRect(0, 0, BSP_LCD_GetXSize(), 90);
-  BSP_LCD_SetTextColor(LCD_COLOR_WHITE);
-  BSP_LCD_SetBackColor(LCD_COLOR_BLUE);
-  BSP_LCD_SetFont(&Font24);
-  BSP_LCD_DisplayStringAt(0, 0, (uint8_t *)"AUDIO RECORD EXAMPLE", CENTER_MODE);
-  BSP_LCD_SetFont(&Font12);
-  BSP_LCD_DisplayStringAt(0, 30, (uint8_t *)"Press User button for next menu", CENTER_MODE);
-
-  /* Set the LCD Text Color */
-  BSP_LCD_SetTextColor(LCD_COLOR_BLUE);
-  BSP_LCD_DrawRect(10, 100, BSP_LCD_GetXSize() - 20, BSP_LCD_GetYSize() - 110);
-  BSP_LCD_DrawRect(11, 101, BSP_LCD_GetXSize() - 22, BSP_LCD_GetYSize() - 112);
+	memcpy(output, original, bytes_size);
+	if (EffectIndex == 0)
+	{
+		ApplyDistortion(original, output, lenght, effects[EffectIndex].Parameter1, effects[EffectIndex].Parameter2); //Gmax2.4f, Gmin0.0f
+	}
+	else if (EffectIndex == 1)
+	{
+		ApplyFuzz(original, output, lenght, effects[EffectIndex].Parameter3, effects[EffectIndex].Parameter1, effects[EffectIndex].Parameter2);
+	}
+//	else if (EffectIndex == 2)
+//	{
+//		ApplyFlanger(original, output, lenght, effects[EffectIndex].Parameter1, effects[EffectIndex].Parameter2, effects[EffectIndex].Parameter3, effects[EffectIndex].Parameter4);
+//	}
+	else if (EffectIndex == 3)
+	{
+		ApplyRotaryEffect(original, output, lenght, effects[EffectIndex].Parameter1, effects[EffectIndex].Parameter2);
+	}
+//	else if (EffectIndex == 4)
+//	{
+//		ApplyReverb(original, output, lenght, effects[EffectIndex].Parameter1, effects[EffectIndex].Parameter2);
+//	}
+	else if (EffectIndex == 5)
+	{
+		ApplyDelay(original, output, lenght, effects[EffectIndex].Parameter1, effects[EffectIndex].Parameter3, effects[EffectIndex].Parameter2);
+	}
 
 }
 
-/*------------------------------------------------------------------------------
-       Callbacks implementation:
-           the callbacks API are defined __weak in the stm32746g_discovery_audio.c file
-           and their implementation should be done the user code if they are needed.
-           Below some examples of callback implementations.
-  ----------------------------------------------------------------------------*/
-/**
-  * @brief Manages the DMA Transfer complete interrupt.
-  * @param None
-  * @retval None
-  */
-void BSP_AUDIO_IN_TransferComplete_CallBack(void)
+void wait_buffer_offset(int state)
+{
+	while (audio_rec_buffer_state != state) {
+		if (CheckForUserInput()) {
+			stop_record = 1;
+		}
+	}
+	audio_rec_buffer_state = BUFFER_OFFSET_NONE;
+}
+
+void AudioRec_demo()
+{
+	AudioRec_SetHint();
+
+	// (16 bit * 16,000 element)   /   ( 16 bit * 16 kHz * 2 channel ) = 0.5 s
+	// 0.5 s * 60 block = 30 s     ; if AUDIO_NB_BLOCKS = 60
+	uint8_t init_status = BSP_AUDIO_IN_InitEx(
+		INPUT_DEVICE_INPUT_LINE_1,      // INPUT_DEVICE_INPUT_LINE_1 INPUT_DEVICE_DIGITAL_MICROPHONE_2
+		DEFAULT_AUDIO_IN_FREQ, 				    // sample rate  : 16 kHz
+		DEFAULT_AUDIO_IN_BIT_RESOLUTION, 		// resolution   : 16 bit
+		DEFAULT_AUDIO_IN_CHANNEL_NBR			// Stereo		: 2 channel
+	);
+
+	BSP_LCD_SetBackColor(LCD_COLOR_WHITE);
+
+	if (init_status != AUDIO_OK) {
+		BSP_LCD_SetTextColor(LCD_COLOR_RED);
+		BSP_LCD_DisplayStringAt(0, BSP_LCD_GetYSize() - 95, (uint8_t*) "  AUDIO RECORD INIT FAIL", CENTER_MODE);
+	}
+	BSP_LCD_SetTextColor(LCD_COLOR_BLUE);
+	BSP_LCD_DisplayStringAt(0, BSP_LCD_GetYSize() - 80, (uint8_t*) "       RECORDING...     ", CENTER_MODE);
+
+	// internal_buffer -> AUDIO_REC_START_ADDR
+	//
+	// Block:                      |                     block_number: 0                     |                     block_number: 1                     |      ...
+	//                             |                                                         |                                                         |
+	// Interrupt:                  |                          HALF 1                       FULL 1                       HALF 2                       FULL 2   ...
+	//                             +----------------------------+----------------------------+----------------------------+----------------------------+
+	// Array  (16 bit):            |            internal_buffer[AUDIO_BLOCK_SIZE]            |            internal_buffer[AUDIO_BLOCK_SIZE]            |      ...
+	//                             +----------------------------+----------------------------+----------------------------+----------------------------+
+	// Size    (8 bit):            |      AUDIO_BLOCK_SIZE      |      AUDIO_BLOCK_SIZE      |      AUDIO_BLOCK_SIZE      |      AUDIO_BLOCK_SIZE      |      ...
+	//                             +----------------------------+----------------------------+----------------------------+----------------------------+
+	// Address (8 bit):   AUDIO_REC_START_ADDR         AUDIO_REC_START_ADDR         AUDIO_REC_START_ADDR         AUDIO_REC_START_ADDR         AUDIO_REC_START_ADDR
+	//                                                 AUDIO_BLOCK_SIZE             1 * AUDIO_BLOCK_SIZE * 2     1 * AUDIO_BLOCK_SIZE * 2     2 * AUDIO_BLOCK_SIZE * 2
+	//                                                                                                           AUDIO_BLOCK_SIZE
+	uint32_t block_number = 0;
+	audio_rec_buffer_state = BUFFER_OFFSET_NONE;
+
+	BSP_AUDIO_IN_Record(internal_buffer, AUDIO_BLOCK_SIZE);
+
+	for (stop_record = 0; !stop_record && block_number < AUDIO_NB_BLOCKS; block_number++) {
+		uint32_t address = AUDIO_REC_START_ADDR + (block_number * AUDIO_BLOCK_SIZE * 2);
+
+		wait_buffer_offset(BUFFER_OFFSET_HALF);
+		memcpy(
+			(uint32_t*) address,
+			internal_buffer,
+			AUDIO_BLOCK_SIZE
+		);
+
+		wait_buffer_offset(BUFFER_OFFSET_FULL);
+		memcpy(
+			(uint32_t*) (address + AUDIO_BLOCK_SIZE),		// next 16,000 bytes = 8,000 element (2 bytes)
+			internal_buffer + (AUDIO_BLOCK_SIZE / 2),  		// half of 16,000 element = 8,000 element
+			AUDIO_BLOCK_SIZE								// [AUDIO_BLOCK_SIZE] bytes = [AUDIO_BLOCK_SIZE / 2] element (2 bytes)
+		);
+	}
+
+	BSP_AUDIO_IN_Stop(CODEC_PDWN_SW);
+
+	sprintf(str_buf, "duration: %.1f s", block_number / 2.0);
+	BSP_LCD_DisplayStringAt(0, BSP_LCD_GetYSize() - 40, (uint8_t*) str_buf, CENTER_MODE);
+	BSP_LCD_DisplayStringAt(0, BSP_LCD_GetYSize() - 65, (uint8_t*) "RECORDING DONE, START PLAYBACK...", CENTER_MODE);
+
+	BSP_AUDIO_OUT_Init(OUTPUT_DEVICE_HEADPHONE, 70, DEFAULT_AUDIO_IN_FREQ);
+	BSP_AUDIO_OUT_SetAudioFrameSlot(CODEC_AUDIOFRAME_SLOT_02);
+
+	uint32_t record_bytes = block_number * AUDIO_BLOCK_SIZE * 2;
+	AUDIO_Effect(record_bytes);
+	AUDIO_Start(OUTPUT_ADDR, record_bytes);
+
+	while (1) {
+		AUDIO_Process();
+		// AUDIO_Effect();
+
+		if (CheckForUserInput()) {
+			BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW);
+			break;
+		}
+	}
+}
+
+void BSP_AUDIO_IN_TransferComplete_CallBack()
 {
   audio_rec_buffer_state = BUFFER_OFFSET_FULL;
   return;
 }
 
-/**
-  * @brief  Manages the DMA Half Transfer complete interrupt.
-  * @param  None
-  * @retval None
-  */
-void BSP_AUDIO_IN_HalfTransfer_CallBack(void)
+
+void BSP_AUDIO_IN_HalfTransfer_CallBack()
 {
   audio_rec_buffer_state = BUFFER_OFFSET_HALF;
   return;
 }
 
-/**
-  * @brief  Audio IN Error callback function.
-  * @param  None
-  * @retval None
-  */
-void BSP_AUDIO_IN_Error_CallBack(void)
+
+void BSP_AUDIO_IN_Error_CallBack()
 {
-  /* This function is called when an Interrupt due to transfer error on or peripheral
-     error occurs. */
-  /* Display message on the LCD screen */
+  /* This function is called when an Interrupt due to transfer error on or peripheral error occurs. */
   BSP_LCD_SetBackColor(LCD_COLOR_RED);
   BSP_LCD_DisplayStringAt(0, LINE(14), (uint8_t *)"       DMA  ERROR     ", CENTER_MODE);
 
   /* Stop the program with an infinite loop */
-  while (BSP_PB_GetState(BUTTON_KEY) != RESET)
-  {
-    return;
-  }
-  /* could also generate a system reset to recover from the error */
-  /* .... */
+  while (BSP_PB_GetState(BUTTON_KEY) != RESET) return;
 }
-
-
-
-/**
-  * @}
-  */
-
-/**
-  * @}
-  */
-

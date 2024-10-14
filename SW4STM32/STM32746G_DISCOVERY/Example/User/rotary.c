@@ -8,6 +8,8 @@
 
 void ApplyRotaryEffect(int16_t *buffer, int16_t *output, uint32_t size, float depth, float rate)
 {
+	depth = depth * (1.6/4096.0);
+	rate = rate * (8.0/4096.0);
     static float phase = 0.0f;
     static float last_amplitude_mod = 1.0f; // Last amplitude for smoothing
     static float delay_buffer[DELAY_BUFFER_SIZE] = {0}; // Delay buffer

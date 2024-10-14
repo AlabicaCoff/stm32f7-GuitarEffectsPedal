@@ -34,8 +34,8 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
-static uint8_t DemoIndex = 0;
 int EffectIndex = 0;
+int ParameterIndex = 0;
 
 ADC_HandleTypeDef    AdcHandle;
 __IO uint16_t uhADCxConvertedValue = 0;
@@ -52,21 +52,23 @@ static void Error_Handler(void);
 static void Display_DemoDescription(void);
 static void CPU_CACHE_Enable(void);
 
-
-BSP_DemoTypedef  BSP_examples[] =
+extern EffectTypedef  effects[] =
   {
-    //{LCD_demo, "LCD", 0},
-    //{Touchscreen_demo, "TOUCHSCREEN", 0},
-    {AudioRec_demo, "AUDIO RECORD", 0},
-    //{AudioLoopback_demo, "AUDIO LOOPBACK", 0},
-    //{AudioPlay_demo, "AUDIO PLAY", 0},
-    //{SD_demo, "mSD", 0},
-    //{Log_demo, "LCD LOG", 0},
-    //{SDRAM_demo, "SDRAM", 0},
-    //{SDRAM_DMA_demo, "SDRAM DMA", 0},
-    //{EEPROM_demo, "EEPROM", 0},
-    //{QSPI_demo, "QSPI", 0},
+    {"DISTORTION EFFECT", 2, 0.0, 0.0, 0.0, 0.0}, 	// ?"           ", 1"Gain", 2"Threshold", ?"    ", ?"        ", ?"   ", ?"           "
+	{"FUZZ EFFECT", 3, 0.0, 0.0, 0.0, 0.0}, 		// 1"Depth      ", 3"Gain", 2"Threshold", ?"    ", ?"        ", ?"   ", ?"           "
+	{"FLANGER EFFECT", 4, 0.0, 0.0, 0.0, 0.0}, 		// 1"Delay-Depth", ?"    ", ?"         ", 2"Rate", 3"Feedback", 4"Mix", ?"           "
+	{"ROTARY EFFECT", 2, 0.0, 0.0, 0.0, 0.0},		// 1"Depth      ", ?"    ", ?"         ", 2"Rate", ?"        ", ?"   ", ?"           "
+	{"REVERB EFFECT", 2, 0.0, 0.0, 0.0, 0.0},		// ?"           ", ?"    ", ?"         ", ?"    ", ?"        ", 2"Mix", 1"Reverb-Time"
+	{"DELAY EFFECT", 3, 0.0, 0.0, 0.0, 0.0}, 		// 1"Delay-Depth", ?"    ", ?"         ", ?"    ", 3"Feedback", 2"Mix", ?"         "
   };
+
+//float depthMax[6] = {0.0, 2.4, 6.0, 1.6, 0.0, 900.0};
+//float gainMax[6] = {2.4, 3.0, 0.0, 0.0, 0.0, 0.0};
+//float thresholdMax[6] = {50000, 30000, 0.0, 0.0, 0.0, 0.0};
+//float rateMax[6] = {0.0, 0.0, 1.0, 8.0, 0.0, 0.0};
+//float feedbackMax[6] = {0.0, 0.0, 0.6, 0.0, 0.0, 0.8};
+//float mixMax[6] = {0.0, 0.0, 1.2, 0.0, 1.4, 1.2};
+//float reverbTimeMax[6] = {0.0, 0.0, 0.0, 0.0, 1000.0, 0.0};
 
 /* Private functions ---------------------------------------------------------*/
 
@@ -75,6 +77,7 @@ BSP_DemoTypedef  BSP_examples[] =
   * @param  None
   * @retval None
   */
+
 int main(void)
 {
   uint8_t  lcd_status = LCD_OK;
@@ -189,34 +192,37 @@ int main(void)
     if (BSP_PB_GetState(BUTTON_KEY) != RESET)
     {
       HAL_Delay(10);
-      while (BSP_PB_GetState(BUTTON_KEY) != RESET)
-      {
-      }
+      while (BSP_PB_GetState(BUTTON_KEY) != RESET);
 
-      BSP_examples[DemoIndex++].DemoFunc();
-
-      if (DemoIndex >= COUNT_OF_EXAMPLE(BSP_examples))
-      {
-        /* Increment number of loops which be used by EEPROM example */
-        NbLoop++;
-        DemoIndex = 0;
-      }
+      AudioRec_demo();
+      Display_DemoDescription();
     }
     uint8_t desc[50];
-    sprintf((char *)desc, "Record and play with effect %d", EffectIndex);
-    BSP_LCD_DisplayStringAt(0, BSP_LCD_GetYSize() / 2 + 45, (uint8_t *)desc, CENTER_MODE);
     uint8_t adcText1[50];
-    sprintf((char *)adcText1, "ADC1 : %d", uhADCxConvertedValue);
-    BSP_LCD_DisplayStringAt(0, BSP_LCD_GetYSize() / 2 + 60, (uint8_t *)adcText1, CENTER_MODE);
-//    printf("%d\n", EffectIndex);
-//
-//    HAL_Delay(200);
+    uint8_t adcText2[50];
+    sprintf((char *)desc, "Effect Select: %s", effects[EffectIndex].Name);
+	BSP_LCD_DisplayStringAt(0, BSP_LCD_GetYSize() / 2 + 45, (uint8_t *)desc, CENTER_MODE);
+	sprintf((char *)adcText1, "P1: %f, P2: %f", effects[EffectIndex].Parameter1, effects[EffectIndex].Parameter2);
+	BSP_LCD_DisplayStringAt(0, BSP_LCD_GetYSize() / 2 + 60, (uint8_t *)adcText1, CENTER_MODE);
+	sprintf((char *)adcText2, "P3: %f, P4: %f", effects[EffectIndex].Parameter3, effects[EffectIndex].Parameter4);
+	BSP_LCD_DisplayStringAt(0, BSP_LCD_GetYSize() / 2 + 75, (uint8_t *)adcText2, CENTER_MODE);
 
-//    while (BSP_PB_GetState(BUTTON_KEY) != RESET);
-//
-//    AudioRec_demo(EffectIndex);
-//    Display_DemoDescription();
-
+	if (ParameterIndex == 0)
+	{
+		effects[EffectIndex].Parameter1 = uhADCxConvertedValue;
+	}
+	else if (ParameterIndex == 1)
+	{
+		effects[EffectIndex].Parameter2 = uhADCxConvertedValue;
+	}
+	else if (ParameterIndex == 2)
+	{
+		effects[EffectIndex].Parameter3 = uhADCxConvertedValue;
+	}
+	else
+	{
+		effects[EffectIndex].Parameter4 = uhADCxConvertedValue;
+	}
 
   }
 }
@@ -292,6 +298,7 @@ static void Display_DemoDescription(void)
 {
   uint8_t desc[50];
   uint8_t adcText1[50];
+  uint8_t adcText2[50];
 
   /* Set LCD Foreground Layer  */
   BSP_LCD_SelectLayer(LTDC_ACTIVE_LAYER);
@@ -321,10 +328,12 @@ static void Display_DemoDescription(void)
   BSP_LCD_SetTextColor(LCD_COLOR_WHITE);
   BSP_LCD_SetBackColor(LCD_COLOR_BLUE);
   BSP_LCD_DisplayStringAt(0, BSP_LCD_GetYSize() / 2 + 30, (uint8_t *)"Press User Button to start :", CENTER_MODE);
-  sprintf((char *)desc, "Record and play with effect %d", EffectIndex);
+  sprintf((char *)desc, "Effect Select: %s", effects[EffectIndex].Name);
   BSP_LCD_DisplayStringAt(0, BSP_LCD_GetYSize() / 2 + 45, (uint8_t *)desc, CENTER_MODE);
-  sprintf((char *)adcText1, "ADC1 : %d", uhADCxConvertedValue);
+  sprintf((char *)adcText1, "P1: %f, P2: %f", effects[EffectIndex].Parameter1, effects[EffectIndex].Parameter2);
   BSP_LCD_DisplayStringAt(0, BSP_LCD_GetYSize() / 2 + 60, (uint8_t *)adcText1, CENTER_MODE);
+  sprintf((char *)adcText2, "P3: %f, P4: %f", effects[EffectIndex].Parameter3, effects[EffectIndex].Parameter4);
+  BSP_LCD_DisplayStringAt(0, BSP_LCD_GetYSize() / 2 + 75, (uint8_t *)adcText2, CENTER_MODE);
 
 }
 
@@ -502,4 +511,3 @@ void assert_failed(uint8_t* file, uint32_t line)
 /**
   * @}
   */
-
